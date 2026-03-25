@@ -182,3 +182,51 @@ The search overlay was just a "not implemented" message. I built it out:
 - Matching text gets highlighted using a `HighlightedText` component that splits the string into spans — no `innerHTML` or `dangerouslySetInnerHTML`
 - Keyboard nav works: arrow keys move through results, Enter selects, Escape closes
 - Shows a spinner while loading, error message with retry button if the fetch fails, and a "no results" message when nothing matches
+
+---
+
+## UI/UX Improvements
+
+After fixing bugs and building the search feature, I spent some time polishing the overall look and feel. Nothing crazy — just stuff I noticed that could be better while I was working through the code.
+
+### 1. Dark mode
+
+I noticed there was a `ThemeContext` already in the project but nothing was actually using it. So I wired up a toggle button (the 🌙 in the header) and wrote a full set of dark theme CSS variables. The background, text, borders, shadows — everything adapts. I added `transition: background 0.2s ease` on the body and key containers so the switch feels smooth instead of jarring.
+
+### 2. Status badge contrast
+
+The "Active" badge had white text on a light green background (`#90EE90` + `#ffffff`). That's basically invisible. I changed it to dark green text on a softer green background (`#166534` on `#dcfce7`). Much easier to read now.
+
+### 3. Buttons feel clickable
+
+The buttons didn't have any pressed/active state — you'd click and nothing happened visually. I added `transform: scale(0.97)` on `:active` so they "push in" slightly when clicked. Small thing but it makes the app feel more responsive.
+
+### 4. Modal opens smoothly
+
+The modal just appeared instantly before, which felt abrupt. I added a quick fade-in on the backdrop and a subtle slide-up + scale animation on the content panel (`translateY(-10px) scale(0.98)` → `translateY(0) scale(1)`). Takes 200ms, barely noticeable but feels way better.
+
+Also made the modal responsive — on screens under 640px it goes full-width with less padding so it doesn't overflow.
+
+### 5. Toast entry animation
+
+The toast notifications slid in from the right, but the easing was basic. I switched to a custom cubic-bezier (`0.21, 1.02, 0.73, 1`) which gives a slight overshoot — feels more natural. Also added `opacity` to the transition and put type-specific icons (`✓`, `✕`, `⚠`) via CSS `::before` pseudo-elements so each toast has a visual indicator without needing more JSX.
+
+### 6. Member card overflow
+
+With longer names, the text could break the card layout. Added `text-overflow: ellipsis` and `overflow: hidden` on the name, and `overflow: hidden` on the card itself.
+
+### 7. Sidebar hides on mobile
+
+On screens under 768px, the sidebar was taking up too much space. I just hid it with `display: none` in a media query. Also hid the "Good morning, John" greeting in the header since it takes up room on small screens.
+
+### 8. Scrollbar styling
+
+The default browser scrollbar looked out of place, especially in dark mode. I added a thin 6px custom scrollbar with a rounded thumb that uses the `--border` color. Subtle but cleaner.
+
+### 9. Focus rings for keyboard users
+
+I added `:focus-visible` outlines (2px solid primary) so keyboard users get a visible focus indicator, but mouse users don't see it. The `:focus:not(:focus-visible)` rule removes the outline for mouse clicks.
+
+### 10. Text selection color
+
+Added `::selection` with a light indigo tint (`rgba(79, 70, 229, 0.2)`) so selected text matches the app's color scheme instead of the default blue.
