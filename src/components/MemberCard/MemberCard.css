@@ -10,12 +10,18 @@
   gap: 8px;
   position: relative;
   box-shadow: var(--shadow-xs);
+  overflow: hidden;
 }
 
 .member-card:hover {
   box-shadow: var(--shadow-md);
   transform: translateY(-2px);
   border-color: rgba(79, 70, 229, 0.15);
+}
+
+.member-card:active {
+  transform: translateY(0);
+  box-shadow: var(--shadow-sm);
 }
 
 .member-card__header {
@@ -69,6 +75,9 @@
   font-weight: 600;
   color: var(--text);
   letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .member-card__role {

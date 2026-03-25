@@ -16,8 +16,9 @@
   padding: 0 24px;
   background: var(--surface);
   border-bottom: 1px solid var(--border);
-  transform: translateZ(0); /* GPU acceleration */
+  transform: translateZ(0);
   box-shadow: var(--shadow-xs);
+  transition: background 0.2s ease, border-color 0.2s ease;
 }
 
 .app-body {
@@ -32,6 +33,7 @@
   overflow-y: auto;
   background: var(--bg);
   min-height: calc(100vh - 60px);
+  transition: background 0.2s ease;
 }
 
 .dashboard-content {
@@ -60,5 +62,11 @@
 @media (max-width: 768px) {
   .main-content {
     padding: 16px;
+  }
+  .sidebar {
+    display: none;
+  }
+  .header__greeting {
+    display: none;
   }
 }

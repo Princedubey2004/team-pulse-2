@@ -8,17 +8,50 @@
   justify-content: center;
   z-index: 1000;
   padding: 16px;
+  animation: modal-backdrop-in 0.15s ease;
+}
+
+@keyframes modal-backdrop-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 .member-modal__content {
   position: relative;
   width: 600px;
+  max-width: 100%;
   overflow-y: auto;
   max-height: 85vh;
   background: var(--surface);
   border-radius: var(--radius-lg, 14px);
   padding: 0;
   box-shadow: var(--shadow-xl);
+  animation: modal-content-in 0.2s ease;
+}
+
+@keyframes modal-content-in {
+  from {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (max-width: 640px) {
+  .member-modal__content {
+    width: 100%;
+    max-height: 90vh;
+    border-radius: var(--radius-md, 10px);
+  }
+  .member-modal__header {
+    padding: 16px 20px 14px;
+  }
+  .member-modal__body {
+    padding: 16px 20px 20px;
+  }
 }
 
 .member-modal__header {

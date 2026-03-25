@@ -135,6 +135,7 @@
   margin-right: 4px;
 }
 
+.header__theme-btn,
 .header__notification-btn {
   background: none;
   border: 1px solid transparent;
@@ -147,9 +148,15 @@
   position: relative;
 }
 
+.header__theme-btn:hover,
 .header__notification-btn:hover {
   background: var(--bg);
   border-color: var(--border);
+}
+
+.header__theme-btn:active,
+.header__notification-btn:active {
+  transform: scale(0.92);
 }
 
 .header__avatar {

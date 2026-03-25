@@ -8,6 +8,20 @@
   flex-direction: column;
   padding: 20px 0;
   overflow-y: auto;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.sidebar__shortcut {
+  margin-left: auto;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 0.625rem;
+  font-weight: 500;
+  background: var(--bg);
+  color: var(--text-tertiary);
+  border: 1px solid var(--border);
+  font-family: inherit;
+  line-height: 1.5;
 }
 
 .sidebar__nav {

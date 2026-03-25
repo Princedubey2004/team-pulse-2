@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { NotificationDropdown } from '../NotificationDropdown/NotificationDropdown';
 import { searchMembers } from '../../api/mockApi';
+import { useTheme } from '../../context/ThemeContext';
 import type { Member } from '../../api/mockApi';
 import './Header.css';
 
@@ -17,6 +18,7 @@ export const Header: React.FC<{ onNavigate: (page: string) => void }> = ({ onNav
   const [showNotifications, setShowNotifications] = useState(false);
   const [searchResults, setSearchResults] = useState<Member[]>([]);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const { theme, toggleTheme } = useTheme();
 
   useEffect(() => {
     setGreeting(computeGreeting());
@@ -68,6 +70,13 @@ export const Header: React.FC<{ onNavigate: (page: string) => void }> = ({ onNav
       </div>
       <div className="header__right">
         <span className="header__greeting">{greeting}, John</span>
+        <button
+          className="header__theme-btn"
+          onClick={toggleTheme}
+          title={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
+        >
+          {theme === 'light' ? '🌙' : '☀️'}
+        </button>
         <button
           className="header__notification-btn"
           onClick={() => setShowNotifications(!showNotifications)}
