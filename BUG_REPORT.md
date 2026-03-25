@@ -1,232 +1,167 @@
 # Bug Report — TeamPulse Dashboard
 
-Hey, so I went through the entire codebase looking for bugs.  
-Here's what I found, why it was breaking, and what I did to fix each one.
+So I went through the whole codebase and found 11 bugs total. Some were pretty obvious, others took a bit of digging. Here's everything documented.
 
 ---
 
-## Bug 1: Timer doesn't count down
+## Bug 1 — Timer is stuck
 
-**Where:** `src/components/Timer/StandupTimer.tsx`
+**File:** `src/components/Timer/StandupTimer.tsx`
 
-Okay so this one was pretty obvious when you look at the dashboard — the timer just sits there frozen.
+First thing I noticed on the dashboard — the countdown timer wasn't moving at all. Looked at the code and found that `setInterval` was using `timeLeft` directly instead of the functional updater. Because `useEffect` runs once (empty deps), `timeLeft` is always the initial value inside that closure. So it keeps doing `initialValue - 1` over and over. Also no `clearInterval` anywhere, which would cause problems if the component re-mounts.
 
-The problem? `setInterval` was set up inside `useEffect` with an empty dep array, which is fine, but the callback was doing `setTimeLeft(timeLeft - 1)`. Since `timeLeft` gets captured at the time the effect runs (only once, on mount), it's always the same initial value. So the timer is technically ticking, but it keeps setting the same number minus one, over and over.
-
-Also there was no `clearInterval`, so if the component ever re-mounts you'd get multiple intervals stacking.
-
-**Fix:** Switched to `setTimeLeft(prev => prev - 1)` so it always reads the latest value, and added a cleanup `return () => clearInterval(id)`.
+**What I did:** Changed `setTimeLeft(timeLeft - 1)` to `setTimeLeft(prev => prev - 1)` and added `return () => clearInterval(id)` in the cleanup.
 
 ---
 
-## Bug 2: Clicking notifications shows wrong ID
+## Bug 2 — Wrong notification ID on click
 
-**Where:** `src/utils/helpers.ts`
+**File:** `src/utils/helpers.ts`
 
-Every notification click was showing `-1` as the ID. Didn't matter which one you clicked.
+Clicking any notification always showed ID `-1`. Classic `var` in a for-loop problem. The function uses `for (var i = ...)` so by the time any handler runs, `i` has already gone past the array length. Every handler reads the same stale value.
 
-Turned out to be the classic `var` scoping issue. The loop in `bindNotificationHandlers` uses `for (var i = ...)` with a closure inside. Since `var` is function-scoped (not block-scoped), by the time you actually click a notification, `i` is already equal to `notifications.length`. So `notifications[i]` is `undefined` and the `?? -1` fallback kicks in.
-
-**Fix:** Just changed `var` to `let`. Now each iteration gets its own `i`.
+**What I did:** Changed `var` to `let`. That's it.
 
 ---
 
-## Bug 3: Sidebar filters do nothing
+## Bug 3 — Filters don't do anything
 
-**Where:** `src/context/FilterContext.tsx`
+**File:** `src/context/FilterContext.tsx`
 
-I spent a minute wondering why clicking the status/role filters had zero effect on the grid. Turns out the `updateFilter` function was doing something pretty sneaky — it was mutating the state object directly:
+Clicked the sidebar filters and nothing happened. The `updateFilter` function was mutating the existing state object directly and then passing the same reference to `setFilters`. React sees the same reference, thinks nothing changed, skips the render.
 
-```ts
-(filters as unknown as Record<string, string>)[key] = value;
-setFilters(filters);
-```
-
-The thing is, React checks if the new state `===` the old state. Since it's the exact same object reference, React goes "nothing changed" and skips the re-render entirely.
-
-**Fix:** `setFilters(prev => ({ ...prev, [key]: value }))` — creates a fresh object so React picks up the change.
+**What I did:** Used `setFilters(prev => ({ ...prev, [key]: value }))` so it actually creates a new object.
 
 ---
 
-## Bug 4: ⌘K shortcut gets weirder the more you navigate
+## Bug 4 — ⌘K starts acting weird after navigating
 
-**Where:** `src/App.tsx`
+**File:** `src/App.tsx`
 
-I noticed that after switching between Dashboard and Activity Feed a few times, pressing ⌘K felt laggy or would trigger multiple times.
+After going back and forth between pages a few times, the search shortcut would fire multiple times or feel laggy. The `useEffect` for the keydown listener had `[currentPage]` as dependency but the handler doesn't use `currentPage`. So each navigation adds another listener and none of them get cleaned up.
 
-The `useEffect` had `[currentPage]` in the dep array, but the handler doesn't even use `currentPage`. So every time you navigate, a brand new `keydown` listener gets added — but the old one is never removed because there's no cleanup. After a few page switches you've got like 5 listeners all firing at once.
-
-**Fix:** Added `return () => document.removeEventListener(...)` and changed deps to `[]` since the handler doesn't depend on anything.
+**What I did:** Switched deps to `[]` and added `removeEventListener` in the cleanup return.
 
 ---
 
-## Bug 5: Resize listener never gets cleaned up
+## Bug 5 — Resize handler leaks
 
-**Where:** `src/pages/Dashboard.tsx`
+**File:** `src/pages/Dashboard.tsx`
 
-Same pattern as Bug 4 basically. There's a resize listener that adjusts grid columns, but no cleanup. Also had a stray `console.log('resize handler fired')` in there.
+Same story as the keyboard one — `addEventListener('resize', ...)` without any cleanup. Plus there was a leftover `console.log` in the handler.
 
-**Fix:** Pulled the handler into a named function, added `removeEventListener` in the cleanup, removed the console.log.
-
----
-
-## Bug 6: Member grid keeps fetching nonstop
-
-**Where:** `src/components/MemberGrid/MemberGrid.tsx`
-
-This one was subtle. If you open the network tab, you'd see `fetchMembers` firing over and over, way more than it should.
-
-The culprit was the useEffect dependency:
-```ts
-useEffect(() => { ... }, [{ status: filters.status, role: filters.role }]);
-```
-
-That inline object `{ status: ..., role: ... }` is created fresh every render. React compares deps by reference, and a new object is never `===` to the previous one. So the effect runs every single render.
-
-**Fix:** Changed it to `[filters.status, filters.role]` — primitives that React can actually compare properly.
+**What I did:** Moved handler to a named function, added cleanup, removed the console.log.
 
 ---
 
-## Bug 7: Header search doesn't debounce properly
+## Bug 6 — Infinite API calls from member grid
 
-**Where:** `src/components/Header/Header.tsx`
+**File:** `src/components/MemberGrid/MemberGrid.tsx`
 
-Three things wrong here:
+Opened the network tab and saw `fetchMembers` firing nonstop. The useEffect had an inline object as dependency — `[{ status: filters.status, role: filters.role }]`. React can't compare objects by value, only by reference, and a new object literal is always a new reference.
 
-1. The `setTimeout` for debouncing was never cleared on the next keystroke. So typing "hello" would fire searches for "h", "he", "hel", "hell", "hello" — just delayed.
-2. No handling for stale responses. If the search for "he" resolves after "hello", old results would overwrite the current ones.
-3. `query` was initialized as `undefined` (`useState<string | undefined>()`), which makes the input uncontrolled at first, then controlled once you type. React warns about this.
-
-**Fix:**
-- Used a `useRef` to store the timeout ID and `clearTimeout` it on each new keystroke
-- Added a `cancelled` flag inside the effect so stale promises don't update state
-- Changed initial state to `useState('')`
+**What I did:** Changed to `[filters.status, filters.role]` — plain strings that React can actually compare.
 
 ---
 
-## Bug 8: Activity feed shows double entries
+## Bug 7 — Search doesn't debounce
 
-**Where:** `src/components/ActivityFeed/ActivityFeed.tsx`
+**File:** `src/components/Header/Header.tsx`
 
-The activity list had way too many items. It was showing duplicates.
+Typing in the search bar was firing a request for every keystroke. Three problems here:
+- Timeout was never cleared between keystrokes
+- No stale response handling (old search could overwrite newer results)
+- `query` started as `undefined` which triggers React's controlled/uncontrolled warning
 
-The useEffect was doing:
-```ts
-setActivities(prev => [...prev, ...data]);
-```
-
-This appends to whatever's already there. In React 18 StrictMode (which is enabled in main.tsx), effects run twice during development. So the data gets appended twice.
-
-Also the list was using `key={index}` which breaks when you sort or filter — React can't tell which item is which.
-
-**Fix:** Changed to `setActivities(data)` (straight replacement, no append) and switched to `key={activity.id}`.
+**What I did:** Added a `useRef` for the timeout, clear it on each change, added a `cancelled` flag in the effect, init query as `''`.
 
 ---
 
-## Bug 9: Batch role update says "success" before it's actually done
+## Bug 8 — Duplicate activity entries
 
-**Where:** `src/utils/batchOperations.ts`
+**File:** `src/components/ActivityFeed/ActivityFeed.tsx`
 
-The `batchAssignRole` function was calling `onSuccess()` way too early. And if any individual update threw an error, it would just get swallowed silently.
+Activity feed was showing double entries. The effect was doing `setActivities(prev => [...prev, ...data])` which appends to existing state. In StrictMode, effects run twice, so data gets added twice. Also was using `key={index}` which is unreliable.
 
-The issue is `Array.forEach` with an async callback:
-```ts
-memberIds.forEach(async (id) => {
-  await updateFn(id, role);
-});
-```
-
-`forEach` doesn't care about the promises returned by async callbacks — it just fires them all off and moves on. The `try/catch` only catches synchronous errors, and `onSuccess` via `setTimeout(..., 0)` runs immediately.
-
-**Fix:** Replaced `forEach` with a `for...of` loop so each update is properly awaited. Removed the `setTimeout` wrapper around `onSuccess`.
+**What I did:** Changed to `setActivities(data)` and switched to `key={activity.id}`.
 
 ---
 
-## Bug 10: Adding tags in the modal mutates original data
+## Bug 9 — Batch update fires success too early
 
-**Where:** `src/components/MemberModal/MemberModal.tsx`
+**File:** `src/utils/batchOperations.ts`
 
-This one's sneaky. When you add a tag, it looks like it's creating a copy:
-```ts
-const updated = { ...selectedMember };
-updated.tags.push(newTag.trim());
-```
+`batchAssignRole` was calling `onSuccess` before the updates actually finished. The function uses `forEach` with an async callback, but `forEach` doesn't wait for promises — it just fires them all and moves on. Errors from individual updates get silently swallowed too.
 
-But the spread operator only does a shallow copy. `updated.tags` is still pointing to the exact same array as `selectedMember.tags`. So `.push()` mutates the original array, which means the parent component's data gets changed too without it knowing.
-
-**Fix:** `{ ...selectedMember, tags: [...selectedMember.tags, newTag.trim()] }` — creates a brand new tags array.
+**What I did:** Replaced `forEach` with `for...of` and removed the `setTimeout` around `onSuccess`.
 
 ---
 
-## Bug 11: Toast notifications break after the first one
+## Bug 10 — Tag mutation leaks to parent
 
-**Where:** `src/components/Toast/ToastContainer.tsx`
+**File:** `src/components/MemberModal/MemberModal.tsx`
 
-Toasts were behaving weirdly — sometimes they wouldn't dismiss, or the wrong one would disappear.
+Adding a tag in the modal was mutating the original member's tags array. The spread `{ ...selectedMember }` only does a shallow copy, so `updated.tags` is still the same array reference. `.push()` modifies that shared array directly.
 
-The problem was `let nextId = 0` declared inside the component body. Every time React re-renders the component, `nextId` resets back to 0. So multiple toasts end up with the same ID, and the auto-dismiss `setTimeout` removes the wrong toast.
-
-**Fix:** Used `useRef(0)` instead. The ref persists across renders, so each toast gets a unique incrementing ID.
+**What I did:** `{ ...selectedMember, tags: [...selectedMember.tags, newTag.trim()] }` — new array, no mutation.
 
 ---
 
-## New Feature: Search Comments
+## Bug 11 — Toast IDs collide
 
-**Where:** `src/components/Search/SearchOverlay.tsx` (rewrote from the placeholder)
+**File:** `src/components/Toast/ToastContainer.tsx`
 
-The search overlay was just a "not implemented" message. I built it out:
+Toast notifications were misbehaving — wrong ones getting removed, sometimes not dismissing. `let nextId = 0` was declared inside the component body, so it resets to 0 every render. Multiple toasts end up with the same ID.
 
-- Fetches comments from `https://jsonplaceholder.typicode.com/comments`
-- Input is debounced (300ms) with proper timeout cleanup
-- Filters on the `body` field, case-insensitive, caps results at 50
-- Matching text gets highlighted using a `HighlightedText` component that splits the string into spans — no `innerHTML` or `dangerouslySetInnerHTML`
-- Keyboard nav works: arrow keys move through results, Enter selects, Escape closes
-- Shows a spinner while loading, error message with retry button if the fetch fails, and a "no results" message when nothing matches
+**What I did:** Replaced with `useRef(0)` so the counter persists across renders.
 
 ---
 
-## UI/UX Improvements
+## Search Comments Feature
 
-After fixing bugs and building the search feature, I spent some time polishing the overall look and feel. Nothing crazy — just stuff I noticed that could be better while I was working through the code.
+**File:** `src/components/Search/SearchOverlay.tsx`
 
-### 1. Dark mode
+The search overlay had a placeholder message saying "not implemented". I built it out:
 
-I noticed there was a `ThemeContext` already in the project but nothing was actually using it. So I wired up a toggle button (the 🌙 in the header) and wrote a full set of dark theme CSS variables. The background, text, borders, shadows — everything adapts. I added `transition: background 0.2s ease` on the body and key containers so the switch feels smooth instead of jarring.
+- Hits `jsonplaceholder.typicode.com/comments` API
+- 300ms debounce on the input with proper cleanup
+- Filters by `body` field, case-insensitive, max 50 results
+- Highlights matching text by splitting into spans (no `dangerouslySetInnerHTML`)
+- Arrow keys navigate results, Enter selects, Escape closes
+- Loading spinner, error state with retry, empty state message
 
-### 2. Status badge contrast
+---
 
-The "Active" badge had white text on a light green background (`#90EE90` + `#ffffff`). That's basically invisible. I changed it to dark green text on a softer green background (`#166534` on `#dcfce7`). Much easier to read now.
+## UI/UX stuff I improved
 
-### 3. Buttons feel clickable
+After the bugs were done, I went back and polished a few things that were bugging me while testing.
 
-The buttons didn't have any pressed/active state — you'd click and nothing happened visually. I added `transform: scale(0.97)` on `:active` so they "push in" slightly when clicked. Small thing but it makes the app feel more responsive.
+### Dark mode
+There was already a `ThemeContext` in the project but nothing used it. I added a toggle in the header and wrote dark theme CSS variables — backgrounds, text colors, borders, shadows all adapt. Put a `transition` on key containers so it doesn't just snap.
 
-### 4. Modal opens smoothly
+### Status badge readability
+"Active" badge had white text on light green. Couldn't read it. Switched to dark green on soft green.
 
-The modal just appeared instantly before, which felt abrupt. I added a quick fade-in on the backdrop and a subtle slide-up + scale animation on the content panel (`translateY(-10px) scale(0.98)` → `translateY(0) scale(1)`). Takes 200ms, barely noticeable but feels way better.
+### Button feedback
+Buttons had no visual response on click. Added a subtle `scale(0.97)` on `:active`.
 
-Also made the modal responsive — on screens under 640px it goes full-width with less padding so it doesn't overflow.
+### Modal animation
+Modal used to just pop in. Added a quick fade + slide animation. Also made it full-width on mobile so it's not tiny on small screens.
 
-### 5. Toast entry animation
+### Toast polish
+Switched the slide-in to a bouncier easing curve. Added ✓ ✕ ⚠ icons per type using `::before`.
 
-The toast notifications slid in from the right, but the easing was basic. I switched to a custom cubic-bezier (`0.21, 1.02, 0.73, 1`) which gives a slight overshoot — feels more natural. Also added `opacity` to the transition and put type-specific icons (`✓`, `✕`, `⚠`) via CSS `::before` pseudo-elements so each toast has a visual indicator without needing more JSX.
+### Card overflow
+Long member names could break the layout. Added `text-overflow: ellipsis`.
 
-### 6. Member card overflow
+### Mobile
+Sidebar was eating screen space on phones. Hidden it below 768px. Also hid the greeting text in the header.
 
-With longer names, the text could break the card layout. Added `text-overflow: ellipsis` and `overflow: hidden` on the name, and `overflow: hidden` on the card itself.
+### Scrollbar
+Styled it thinner (6px) with rounded corners. Looks better in dark mode especially.
 
-### 7. Sidebar hides on mobile
+### Keyboard focus
+Added `:focus-visible` outlines so tab navigation works properly, but mouse clicks don't show a ring.
 
-On screens under 768px, the sidebar was taking up too much space. I just hid it with `display: none` in a media query. Also hid the "Good morning, John" greeting in the header since it takes up room on small screens.
-
-### 8. Scrollbar styling
-
-The default browser scrollbar looked out of place, especially in dark mode. I added a thin 6px custom scrollbar with a rounded thumb that uses the `--border` color. Subtle but cleaner.
-
-### 9. Focus rings for keyboard users
-
-I added `:focus-visible` outlines (2px solid primary) so keyboard users get a visible focus indicator, but mouse users don't see it. The `:focus:not(:focus-visible)` rule removes the outline for mouse clicks.
-
-### 10. Text selection color
-
-Added `::selection` with a light indigo tint (`rgba(79, 70, 229, 0.2)`) so selected text matches the app's color scheme instead of the default blue.
+### Selection color
+Changed text selection to match the app's indigo color instead of the default blue.
