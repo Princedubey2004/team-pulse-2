@@ -1,0 +1,41 @@
+.dashboard__title {
+  margin-bottom: 28px;
+}
+
+.dashboard__title h1 {
+  font-size: 1.625rem;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -0.025em;
+}
+
+.dashboard__title p {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+.dashboard__top {
+  display: flex;
+  gap: 20px;
+  align-items: stretch;
+  margin-bottom: 28px;
+}
+
+.dashboard__top > :first-child {
+  flex: 1;
+  min-width: 0;
+}
+
+.dashboard__top > :last-child {
+  flex: 0 0 280px;
+}
+
+@media (max-width: 900px) {
+  .dashboard__top {
+    flex-direction: column;
+  }
+  .dashboard__top > :last-child {
+    flex: none;
+  }
+}

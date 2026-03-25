@@ -1,0 +1,42 @@
+.standup-timer {
+  background: linear-gradient(135deg, #4f46e5, #6366f1);
+  border-radius: var(--radius-lg, 14px);
+  padding: 24px;
+  color: #ffffff;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 4px 14px rgba(79, 70, 229, 0.25);
+  height: 100%;
+  min-height: 160px;
+}
+
+.standup-timer h3 {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  opacity: 0.85;
+  margin: 0;
+}
+
+.standup-timer__icon {
+  font-size: 1.5rem;
+  margin-bottom: 4px;
+}
+
+.standup-timer__display {
+  font-size: 2.25rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+  line-height: 1;
+}
+
+.standup-timer__label {
+  font-size: 0.8125rem;
+  opacity: 0.7;
+  margin: 0;
+}
